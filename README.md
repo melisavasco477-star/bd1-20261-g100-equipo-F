@@ -1,3 +1,5 @@
+![Logo Institución Universitaria Pascual Bravo](logo-pascual-bravo.png)
+
 # INSTITUCIÓN UNIVERSITARIA PASCUAL BRAVO
 
 ## Base de Datos I
