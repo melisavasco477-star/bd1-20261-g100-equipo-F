@@ -8,7 +8,7 @@
 
 **Semestre:** 2026-1
 
-**Grupo:** G100 - Equipo F
+**Grupo:** G52 - Equipo F
 
 ---
 
