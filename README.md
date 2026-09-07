@@ -1,4 +1,4 @@
-![Logo Institución Universitaria Pascual Bravo](logo-pascual-bravo.png)
+<img src="logo-pascual-bravo.png" width="250">
 
 # INSTITUCIÓN UNIVERSITARIA PASCUAL BRAVO
 
