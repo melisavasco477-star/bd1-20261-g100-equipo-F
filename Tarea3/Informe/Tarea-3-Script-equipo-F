@@ -1,0 +1,448 @@
+-- =====================================================================
+-- RED SOCIAL PASCUALINA
+-- Script DDL de CREACION - PostgreSQL (pgAdmin4)
+-- EA3 - Proyecto de Aula (Fase 3)
+--
+-- Orden de ejecucion: primero las tablas independientes (catalogos y
+-- usuario) y luego las dependientes. Se ejecuta de principio a fin sin
+-- errores sobre una base de datos vacia.
+--
+-- Nomenclatura:
+--   * snake_case, singular, sin tildes ni enie
+--   * pk_<tabla>, fk_<tabla_hija>_<tabla_padre|rol>, uq_<tabla>_<campo>,
+--     ck_<tabla>_<regla>
+--
+-- Politica de acciones referenciales (ON DELETE / ON UPDATE):
+--   * ON UPDATE CASCADE en todas las FK: si cambia una clave, el cambio
+--     se propaga (en la practica las claves IDENTITY no se modifican).
+--   * Catalogos (tipo_*, rol) y contenido con traza (ventas, mensajes,
+--     grupos y eventos creados): ON DELETE RESTRICT, para no perder
+--     historia ni dejar registros huerfanos.
+--   * Datos que no tienen sentido sin su padre (perfil, comentarios,
+--     reacciones, denuncias, membresias, seguidores): ON DELETE CASCADE.
+--   * Referencias opcionales (notificacion -> publicacion / mensaje):
+--     ON DELETE SET NULL, la notificacion se conserva.
+-- =====================================================================
+
+
+-- ---------------------------------------------------------------------
+-- 1. TABLAS DE REFERENCIA (CATALOGOS)  - independientes
+-- ---------------------------------------------------------------------
+
+CREATE TABLE rol (
+    id_rol       INTEGER      GENERATED ALWAYS AS IDENTITY,
+    nombre       VARCHAR(50)  NOT NULL,
+    descripcion  VARCHAR(255),
+    estado       VARCHAR(20)  NOT NULL DEFAULT 'activo',
+    CONSTRAINT pk_rol         PRIMARY KEY (id_rol),
+    CONSTRAINT uq_rol_nombre  UNIQUE (nombre),
+    CONSTRAINT ck_rol_estado  CHECK (estado IN ('activo', 'inactivo'))
+);
+
+CREATE TABLE tipo_usuario (
+    id_tipo_usuario  INTEGER      GENERATED ALWAYS AS IDENTITY,
+    nombre           VARCHAR(50)  NOT NULL,
+    descripcion      VARCHAR(255),
+    estado           VARCHAR(20)  NOT NULL DEFAULT 'activo',
+    CONSTRAINT pk_tipo_usuario         PRIMARY KEY (id_tipo_usuario),
+    CONSTRAINT uq_tipo_usuario_nombre  UNIQUE (nombre),
+    CONSTRAINT ck_tipo_usuario_estado  CHECK (estado IN ('activo', 'inactivo'))
+);
+
+CREATE TABLE tipo_servicio (
+    id_tipo_servicio  INTEGER       GENERATED ALWAYS AS IDENTITY,
+    nombre            VARCHAR(100)  NOT NULL,
+    descripcion       VARCHAR(255),
+    estado            VARCHAR(20)   NOT NULL DEFAULT 'activo',
+    CONSTRAINT pk_tipo_servicio         PRIMARY KEY (id_tipo_servicio),
+    CONSTRAINT uq_tipo_servicio_nombre  UNIQUE (nombre),
+    CONSTRAINT ck_tipo_servicio_estado  CHECK (estado IN ('activo', 'inactivo'))
+);
+
+CREATE TABLE tipo_producto (
+    id_tipo_producto  INTEGER      GENERATED ALWAYS AS IDENTITY,
+    nombre            VARCHAR(50)  NOT NULL,
+    descripcion       VARCHAR(255),
+    estado            VARCHAR(20)  NOT NULL DEFAULT 'activo',
+    CONSTRAINT pk_tipo_producto         PRIMARY KEY (id_tipo_producto),
+    CONSTRAINT uq_tipo_producto_nombre  UNIQUE (nombre),
+    CONSTRAINT ck_tipo_producto_estado  CHECK (estado IN ('activo', 'inactivo'))
+);
+
+CREATE TABLE tipo_evento (
+    id_tipo_evento  INTEGER      GENERATED ALWAYS AS IDENTITY,
+    nombre          VARCHAR(50)  NOT NULL,
+    descripcion     VARCHAR(255),
+    estado          VARCHAR(20)  NOT NULL DEFAULT 'activo',
+    CONSTRAINT pk_tipo_evento         PRIMARY KEY (id_tipo_evento),
+    CONSTRAINT uq_tipo_evento_nombre  UNIQUE (nombre),
+    CONSTRAINT ck_tipo_evento_estado  CHECK (estado IN ('activo', 'inactivo'))
+);
+
+CREATE TABLE tipo_reaccion (
+    id_tipo_reaccion  INTEGER      GENERATED ALWAYS AS IDENTITY,
+    nombre            VARCHAR(50)  NOT NULL,
+    descripcion       VARCHAR(255),
+    CONSTRAINT pk_tipo_reaccion         PRIMARY KEY (id_tipo_reaccion),
+    CONSTRAINT uq_tipo_reaccion_nombre  UNIQUE (nombre)
+);
+
+CREATE TABLE tipo_notificacion (
+    id_tipo_notificacion  INTEGER      GENERATED ALWAYS AS IDENTITY,
+    nombre                VARCHAR(50)  NOT NULL,
+    descripcion           VARCHAR(255),
+    CONSTRAINT pk_tipo_notificacion         PRIMARY KEY (id_tipo_notificacion),
+    CONSTRAINT uq_tipo_notificacion_nombre  UNIQUE (nombre)
+);
+
+CREATE TABLE tipo_denuncia (
+    id_tipo_denuncia  INTEGER      GENERATED ALWAYS AS IDENTITY,
+    nombre            VARCHAR(50)  NOT NULL,
+    descripcion       VARCHAR(255),
+    CONSTRAINT pk_tipo_denuncia         PRIMARY KEY (id_tipo_denuncia),
+    CONSTRAINT uq_tipo_denuncia_nombre  UNIQUE (nombre)
+);
+
+
+-- ---------------------------------------------------------------------
+-- 2. USUARIO Y PERFIL
+-- ---------------------------------------------------------------------
+
+CREATE TABLE usuario (
+    id_usuario       INTEGER       GENERATED ALWAYS AS IDENTITY,
+    id_rol           INTEGER       NOT NULL,
+    id_tipo_usuario  INTEGER       NOT NULL,
+    nombres          VARCHAR(100)  NOT NULL,
+    apellidos        VARCHAR(100)  NOT NULL,
+    correo           VARCHAR(150)  NOT NULL,
+    contrasena       VARCHAR(255)  NOT NULL,
+    telefono         VARCHAR(20)   NOT NULL,
+    fecha_registro   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado           VARCHAR(20)   NOT NULL DEFAULT 'activo',
+    CONSTRAINT pk_usuario         PRIMARY KEY (id_usuario),
+    CONSTRAINT uq_usuario_correo  UNIQUE (correo),
+    CONSTRAINT ck_usuario_estado  CHECK (estado IN ('activo', 'inactivo', 'suspendido')),
+    CONSTRAINT fk_usuario_rol
+        FOREIGN KEY (id_rol) REFERENCES rol (id_rol)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_usuario_tipo_usuario
+        FOREIGN KEY (id_tipo_usuario) REFERENCES tipo_usuario (id_tipo_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE perfil (
+    id_perfil            INTEGER        GENERATED ALWAYS AS IDENTITY,
+    id_usuario           INTEGER        NOT NULL,
+    informacion          VARCHAR(7000),
+    fecha_actualizacion  TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_perfil             PRIMARY KEY (id_perfil),
+    CONSTRAINT uq_perfil_usuario     UNIQUE (id_usuario),      -- relacion 1 a 1
+    CONSTRAINT fk_perfil_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+
+-- ---------------------------------------------------------------------
+-- 3. PUBLICACIONES, COMENTARIOS, GRUPOS Y SEGUIDORES
+-- ---------------------------------------------------------------------
+
+CREATE TABLE publicacion (
+    id_publicacion     INTEGER        GENERATED ALWAYS AS IDENTITY,
+    id_usuario         INTEGER        NOT NULL,
+    contenido          VARCHAR(7000)  NOT NULL,
+    tipo_contenido     VARCHAR(30)    NOT NULL,
+    fecha_publicacion  TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_publicacion PRIMARY KEY (id_publicacion),
+    CONSTRAINT fk_publicacion_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE comentario (
+    id_comentario     INTEGER        GENERATED ALWAYS AS IDENTITY,
+    id_publicacion    INTEGER        NOT NULL,
+    id_usuario        INTEGER        NOT NULL,
+    contenido         VARCHAR(7000)  NOT NULL,
+    fecha_comentario  TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_comentario PRIMARY KEY (id_comentario),
+    CONSTRAINT fk_comentario_publicacion
+        FOREIGN KEY (id_publicacion) REFERENCES publicacion (id_publicacion)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_comentario_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE grupo (
+    id_grupo            INTEGER       GENERATED ALWAYS AS IDENTITY,
+    id_usuario_creador  INTEGER       NOT NULL,
+    nombre              VARCHAR(100)  NOT NULL,
+    descripcion         VARCHAR(500),
+    categoria           VARCHAR(100),
+    privacidad          VARCHAR(20)   NOT NULL DEFAULT 'publico',
+    fecha_creacion      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado              VARCHAR(20)   NOT NULL DEFAULT 'activo',
+    CONSTRAINT pk_grupo PRIMARY KEY (id_grupo),
+    CONSTRAINT ck_grupo_privacidad CHECK (privacidad IN ('publico', 'privado')),
+    CONSTRAINT ck_grupo_estado     CHECK (estado IN ('activo', 'inactivo')),
+    CONSTRAINT fk_grupo_usuario_creador
+        FOREIGN KEY (id_usuario_creador) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- Relacion N:M  Usuario <-> Grupo ("Participa en")
+CREATE TABLE usuario_grupo (
+    id_usuario   INTEGER    NOT NULL,
+    id_grupo     INTEGER    NOT NULL,
+    fecha_union  TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_usuario_grupo PRIMARY KEY (id_usuario, id_grupo),
+    CONSTRAINT fk_usuario_grupo_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_usuario_grupo_grupo
+        FOREIGN KEY (id_grupo) REFERENCES grupo (id_grupo)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Relacion N:M reflexiva  Usuario <-> Usuario ("Sigue")
+CREATE TABLE seguidor (
+    id_usuario_seguidor  INTEGER    NOT NULL,
+    id_usuario_seguido   INTEGER    NOT NULL,
+    fecha_seguimiento    TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_seguidor PRIMARY KEY (id_usuario_seguidor, id_usuario_seguido),
+    CONSTRAINT ck_seguidor_distintos CHECK (id_usuario_seguidor <> id_usuario_seguido),
+    CONSTRAINT fk_seguidor_usuario_seguidor
+        FOREIGN KEY (id_usuario_seguidor) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_seguidor_usuario_seguido
+        FOREIGN KEY (id_usuario_seguido) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+
+-- ---------------------------------------------------------------------
+-- 4. SERVICIOS Y PRODUCTOS (compra / venta con traza)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE servicio (
+    id_servicio       INTEGER        GENERATED ALWAYS AS IDENTITY,
+    id_usuario        INTEGER        NOT NULL,                 -- quien ofrece el servicio
+    id_tipo_servicio  INTEGER        NOT NULL,
+    nombre            VARCHAR(150)   NOT NULL,
+    precio            NUMERIC(10,2)  NOT NULL,
+    duracion          VARCHAR(50),
+    CONSTRAINT pk_servicio PRIMARY KEY (id_servicio),
+    CONSTRAINT ck_servicio_precio CHECK (precio >= 0),
+    CONSTRAINT fk_servicio_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_servicio_tipo_servicio
+        FOREIGN KEY (id_tipo_servicio) REFERENCES tipo_servicio (id_tipo_servicio)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE producto (
+    id_producto          INTEGER        GENERATED ALWAYS AS IDENTITY,
+    id_usuario_vendedor  INTEGER        NOT NULL,
+    id_tipo_producto     INTEGER        NOT NULL,
+    nombre               VARCHAR(150)   NOT NULL,
+    precio               NUMERIC(10,2)  NOT NULL,
+    cantidad             INTEGER        NOT NULL,
+    CONSTRAINT pk_producto PRIMARY KEY (id_producto),
+    CONSTRAINT ck_producto_precio   CHECK (precio >= 0),
+    CONSTRAINT ck_producto_cantidad CHECK (cantidad >= 0),
+    CONSTRAINT fk_producto_usuario_vendedor
+        FOREIGN KEY (id_usuario_vendedor) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_producto_tipo_producto
+        FOREIGN KEY (id_tipo_producto) REFERENCES tipo_producto (id_tipo_producto)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- Traza de solicitudes de servicios (N:M Usuario <-> Servicio, con atributos)
+CREATE TABLE usuario_servicio (
+    id_solicitud     INTEGER      GENERATED ALWAYS AS IDENTITY,
+    id_usuario       INTEGER      NOT NULL,                    -- quien lo solicita
+    id_servicio      INTEGER      NOT NULL,
+    fecha_solicitud  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado           VARCHAR(30)  NOT NULL DEFAULT 'pendiente',
+    CONSTRAINT pk_usuario_servicio PRIMARY KEY (id_solicitud),
+    CONSTRAINT ck_usuario_servicio_estado
+        CHECK (estado IN ('pendiente', 'aceptada', 'completada', 'cancelada')),
+    CONSTRAINT fk_usuario_servicio_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_usuario_servicio_servicio
+        FOREIGN KEY (id_servicio) REFERENCES servicio (id_servicio)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- Traza de ventas de productos (N:M Usuario <-> Producto, con atributos)
+CREATE TABLE usuario_producto (
+    id_adquisicion     INTEGER    GENERATED ALWAYS AS IDENTITY,
+    id_producto        INTEGER    NOT NULL,
+    id_usuario         INTEGER    NOT NULL,                    -- quien lo compra
+    cantidad           INTEGER    NOT NULL,
+    fecha_adquisicion  TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_usuario_producto PRIMARY KEY (id_adquisicion),
+    CONSTRAINT ck_usuario_producto_cantidad CHECK (cantidad > 0),
+    CONSTRAINT fk_usuario_producto_producto
+        FOREIGN KEY (id_producto) REFERENCES producto (id_producto)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_usuario_producto_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+
+-- ---------------------------------------------------------------------
+-- 5. EVENTOS Y REACCIONES
+-- ---------------------------------------------------------------------
+
+CREATE TABLE evento (
+    id_evento       INTEGER       GENERATED ALWAYS AS IDENTITY,
+    id_usuario      INTEGER       NOT NULL,                    -- organizador
+    id_tipo_evento  INTEGER       NOT NULL,
+    nombre          VARCHAR(100)  NOT NULL,
+    fecha           TIMESTAMP     NOT NULL,
+    descripcion     VARCHAR(500),
+    ubicacion       VARCHAR(150),
+    CONSTRAINT pk_evento PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_evento_tipo_evento
+        FOREIGN KEY (id_tipo_evento) REFERENCES tipo_evento (id_tipo_evento)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- Relacion N:M  Usuario <-> Evento ("Participa en")
+CREATE TABLE usuario_evento (
+    id_usuario         INTEGER    NOT NULL,
+    id_evento          INTEGER    NOT NULL,
+    fecha_inscripcion  TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_usuario_evento PRIMARY KEY (id_usuario, id_evento),
+    CONSTRAINT fk_usuario_evento_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_usuario_evento_evento
+        FOREIGN KEY (id_evento) REFERENCES evento (id_evento)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE reaccion (
+    id_reaccion       INTEGER  GENERATED ALWAYS AS IDENTITY,
+    id_usuario        INTEGER  NOT NULL,
+    id_publicacion    INTEGER  NOT NULL,
+    id_tipo_reaccion  INTEGER  NOT NULL,
+    CONSTRAINT pk_reaccion PRIMARY KEY (id_reaccion),
+    CONSTRAINT uq_reaccion_usuario_publicacion UNIQUE (id_usuario, id_publicacion),
+    CONSTRAINT fk_reaccion_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_reaccion_publicacion
+        FOREIGN KEY (id_publicacion) REFERENCES publicacion (id_publicacion)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_reaccion_tipo_reaccion
+        FOREIGN KEY (id_tipo_reaccion) REFERENCES tipo_reaccion (id_tipo_reaccion)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+
+-- ---------------------------------------------------------------------
+-- 6. MENSAJES PRIVADOS (antes de notificacion, que lo referencia)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE mensaje_chat (
+    id_mensaje      INTEGER        GENERATED ALWAYS AS IDENTITY,
+    id_emisor       INTEGER        NOT NULL,
+    id_receptor     INTEGER        NOT NULL,
+    contenido       VARCHAR(1000),
+    tipo_contenido  VARCHAR(20)    NOT NULL,
+    fecha_envio     TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_lectura   TIMESTAMP,
+    CONSTRAINT pk_mensaje_chat PRIMARY KEY (id_mensaje),
+    CONSTRAINT ck_mensaje_chat_distintos CHECK (id_emisor <> id_receptor),
+    CONSTRAINT fk_mensaje_chat_emisor
+        FOREIGN KEY (id_emisor) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_mensaje_chat_receptor
+        FOREIGN KEY (id_receptor) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+
+-- ---------------------------------------------------------------------
+-- 7. NOTIFICACIONES Y SOLICITUDES DE AMISTAD
+-- ---------------------------------------------------------------------
+
+CREATE TABLE notificacion (
+    id_notificacion       INTEGER       GENERATED ALWAYS AS IDENTITY,
+    id_usuario            INTEGER       NOT NULL,              -- quien la recibe
+    id_tipo_notificacion  INTEGER       NOT NULL,
+    id_publicacion        INTEGER,                             -- opcional
+    id_mensaje            INTEGER,                             -- opcional
+    texto                 VARCHAR(255)  NOT NULL,
+    fecha                 TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_notificacion PRIMARY KEY (id_notificacion),
+    CONSTRAINT fk_notificacion_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_notificacion_tipo_notificacion
+        FOREIGN KEY (id_tipo_notificacion) REFERENCES tipo_notificacion (id_tipo_notificacion)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_notificacion_publicacion
+        FOREIGN KEY (id_publicacion) REFERENCES publicacion (id_publicacion)
+        ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT fk_notificacion_mensaje_chat
+        FOREIGN KEY (id_mensaje) REFERENCES mensaje_chat (id_mensaje)
+        ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE solicitud_amistad (
+    id_solicitud     INTEGER      GENERATED ALWAYS AS IDENTITY,
+    id_remitente     INTEGER      NOT NULL,
+    id_destinatario  INTEGER      NOT NULL,
+    estado           VARCHAR(20)  NOT NULL DEFAULT 'pendiente',
+    fecha_solicitud  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_solicitud_amistad PRIMARY KEY (id_solicitud),
+    CONSTRAINT uq_solicitud_amistad_usuarios UNIQUE (id_remitente, id_destinatario),
+    CONSTRAINT ck_solicitud_amistad_estado
+        CHECK (estado IN ('pendiente', 'aceptada', 'rechazada')),
+    CONSTRAINT ck_solicitud_amistad_distintos CHECK (id_remitente <> id_destinatario),
+    CONSTRAINT fk_solicitud_amistad_remitente
+        FOREIGN KEY (id_remitente) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_solicitud_amistad_destinatario
+        FOREIGN KEY (id_destinatario) REFERENCES usuario (id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+
+-- ---------------------------------------------------------------------
+-- 8. DENUNCIAS
+-- ---------------------------------------------------------------------
+
+CREATE TABLE denuncia (
+    id_denuncia       INTEGER       GENERATED ALWAYS AS IDENTITY,
+    id_usuario        INTEGER       NOT NULL,                  -- quien denuncia
+    id_publicacion    INTEGER       NOT NULL,
+    id_tipo_denuncia  INTEGER       NOT NULL,
+    evidencia         TEXT,
+    estado            VARCHAR(15)   NOT NULL DEFAULT 'pendiente',
+    fecha_reporte     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    accion_tomada     VARCHAR(100),
+    CONSTRAINT pk_denuncia PRIMARY KEY (id_denuncia),
+    CONSTRAINT ck_denuncia_estado
+        CHECK (estado IN ('pendiente', 'en_revision', 'resuelta', 'rechazada')),
+    CONSTRAINT fk_denuncia_usuario
+        FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_denuncia_publicacion
+        FOREIGN KEY (id_publicacion) REFERENCES publicacion (id_publicacion)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_denuncia_tipo_denuncia
+        FOREIGN KEY (id_tipo_denuncia) REFERENCES tipo_denuncia (id_tipo_denuncia)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
