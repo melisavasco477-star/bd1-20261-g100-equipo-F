@@ -1,0 +1,107 @@
+-- 1. Columna JSONB en usuario
+ALTER TABLE usuario
+    ADD COLUMN perfil_extendido JSONB;
+
+ALTER TABLE usuario
+    ADD CONSTRAINT ck_usuario_perfil_extendido_objeto
+    CHECK (perfil_extendido IS NULL OR jsonb_typeof(perfil_extendido) = 'object');
+
+-- 2. Otro dato semi-estructurado: preferencias de la publicacion / metadatos
+ALTER TABLE publicacion
+    ADD COLUMN metadatos JSONB;
+
+ALTER TABLE publicacion
+    ADD CONSTRAINT ck_publicacion_metadatos_objeto
+    CHECK (metadatos IS NULL OR jsonb_typeof(metadatos) = 'object');
+
+-- 3. Indices GIN para consultas eficientes sobre JSONB
+CREATE INDEX idx_usuario_perfil_extendido ON usuario USING GIN (perfil_extendido);
+CREATE INDEX idx_publicacion_metadatos    ON publicacion USING GIN (metadatos);
+
+-- 4. Datos base de catalogos (necesarios para insertar usuarios)
+INSERT INTO rol (nombre, descripcion) VALUES
+    ('usuario', 'Usuario estandar'),
+    ('administrador', 'Administrador de la red');
+
+INSERT INTO tipo_usuario (nombre, descripcion) VALUES
+    ('estudiante', 'Estudiante de la universidad'),
+    ('docente', 'Docente de la universidad'),
+    ('empresario', 'Empresario o emprendedor');
+
+INSERT INTO tipo_reaccion (nombre) VALUES ('me gusta');
+
+-- 5. Insercion de usuarios con JSONB
+INSERT INTO usuario (id_rol, id_tipo_usuario, nombres, apellidos, correo, contrasena, telefono, perfil_extendido)
+VALUES (
+    1,
+    (SELECT id_tipo_usuario FROM tipo_usuario WHERE nombre = 'estudiante'),
+    'Ana', 'Torres', 'ana.torres@pascual.edu.co', 'hash_ana', '3001112233',
+    '{
+        "intereses": ["programación", "videojuegos", "IA"],
+        "habilidades": [
+            {"nombre": "Python", "nivel": "intermedio"},
+            {"nombre": "SQL", "nivel": "básico"}
+        ],
+        "materias_actuales": ["Bases de Datos I", "Algoritmos"],
+        "disponibilidad": {"dias": ["lunes", "miércoles"], "horario": "tarde"}
+    }'::jsonb
+);
+
+INSERT INTO usuario (id_rol, id_tipo_usuario, nombres, apellidos, correo, contrasena, telefono, perfil_extendido)
+VALUES (
+    1,
+    (SELECT id_tipo_usuario FROM tipo_usuario WHERE nombre = 'docente'),
+    'Carlos', 'Gómez', 'carlos.gomez@pascual.edu.co', 'hash_carlos', '3004445566',
+    '{
+        "lineas_investigacion": ["Big Data", "IoT"],
+        "publicaciones": [
+            {"titulo": "Análisis de Datos", "anio": 2023},
+            {"titulo": "IoT en educación", "anio": 2024}
+        ],
+        "disponibilidad_tutoria": {"dias": ["martes", "jueves"], "horario": "mañana"}
+    }'::jsonb
+);
+
+INSERT INTO usuario (id_rol, id_tipo_usuario, nombres, apellidos, correo, contrasena, telefono, perfil_extendido)
+VALUES (
+    1,
+    (SELECT id_tipo_usuario FROM tipo_usuario WHERE nombre = 'empresario'),
+    'Laura', 'Pérez', 'laura.perez@pascual.edu.co', 'hash_laura', '3007778899',
+    '{
+        "ofertas": ["Asesoría en marketing", "Desarrollo web"],
+        "intereses_comerciales": ["startups", "e-commerce"]
+    }'::jsonb
+);
+
+-- 6. Insercion de publicaciones con JSONB
+INSERT INTO publicacion (id_usuario, contenido, tipo_contenido, metadatos)
+VALUES (
+    1, 'Mi primer proyecto en Python', 'texto',
+    '{"etiquetas": ["python", "proyecto"], "ubicacion": "Medellín", "visibilidad": "publica"}'::jsonb
+);
+
+-- 7. Consultas
+-- Buscar usuarios por tipo
+SELECT u.id_usuario, u.nombres, u.apellidos, t.nombre AS tipo_usuario
+FROM usuario u
+JOIN tipo_usuario t ON t.id_tipo_usuario = u.id_tipo_usuario
+WHERE t.nombre = 'estudiante';
+
+-- Usuarios interesados en "IA"
+SELECT nombres, perfil_extendido
+FROM usuario
+WHERE perfil_extendido -> 'intereses' ? 'IA';
+
+-- Habilidades de cada usuario
+SELECT nombres, perfil_extendido -> 'habilidades' AS habilidades
+FROM usuario;
+
+-- Docentes con linea de investigacion "Big Data"
+SELECT nombres, perfil_extendido -> 'lineas_investigacion' AS lineas
+FROM usuario
+WHERE perfil_extendido @> '{"lineas_investigacion": ["Big Data"]}';
+
+-- Publicaciones con la etiqueta "python"
+SELECT id_publicacion, contenido, metadatos -> 'etiquetas' AS etiquetas
+FROM publicacion
+WHERE metadatos -> 'etiquetas' ? 'python';

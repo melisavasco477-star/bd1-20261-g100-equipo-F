@@ -1,0 +1,288 @@
+
+-- BASE DE DATOS RED SOCIAL PASCUALINA
+
+IF DB_ID('RedPascualina') IS NULL
+    CREATE DATABASE RedSocialPascualina;
+GO
+
+USE RedPascualina;
+GO
+
+-- 1. TABLA ROL
+CREATE TABLE rol (
+    id_rol INT IDENTITY(1,1) PRIMARY KEY,
+    nombre VARCHAR     (20)  NOT NULL UNIQUE,
+    descripcion VARCHAR(20),
+    estado VARCHAR     (10)  NOT NULL
+);
+GO
+
+-- 2. TABLA TIPO USUARIO
+CREATE TABLE tipo_usuario (
+    id_tipo_usuario INT IDENTITY(1,1) PRIMARY KEY,
+    nombre          VARCHAR     (20)  NOT NULL UNIQUE,
+    descripcion     VARCHAR     (20),
+    estado          VARCHAR     (10)  NOT NULL
+);
+GO
+
+-- 3. TABLA TIPO SERVICIO
+CREATE TABLE tipo_servicio (
+    id_tipo_servicio INT IDENTITY(1,1) PRIMARY KEY,
+    nombre           VARCHAR     (20)  NOT NULL UNIQUE,
+    descripcion      VARCHAR     (20),
+    estado           VARCHAR     (10)  NOT NULL
+);
+GO
+
+-- 4. TABLA TIPO PRODUCTO
+CREATE TABLE tipo_producto (
+    id_tipo_producto INT IDENTITY(1,1) PRIMARY KEY,
+    nombre           VARCHAR     (20)  NOT NULL UNIQUE,
+    descripcion      VARCHAR     (20),
+    estado           VARCHAR     (10)  NOT NULL
+);
+GO
+
+-- 5. TABLA TIPO EVENTO
+CREATE TABLE tipo_evento (
+    id_tipo_evento INT IDENTITY(1,1) PRIMARY KEY,
+    nombre         VARCHAR     (20)  NOT NULL UNIQUE,
+    descripcion    VARCHAR     (20),
+    estado         VARCHAR     (10)  NOT NULL
+);
+GO
+
+-- 6. TABLA TIPO REACCION
+CREATE TABLE tipo_reaccion (
+    id_tipo_reaccion INT IDENTITY(1,1) PRIMARY KEY,
+    nombre           VARCHAR     (20)  NOT NULL UNIQUE,
+    descripcion      VARCHAR     (20)
+);
+GO
+
+-- 7. TABLA TIPO NOTIFICACION
+CREATE TABLE tipo_notificacion (
+    id_tipo_notificacion INT IDENTITY(1,1) PRIMARY KEY,
+    nombre               VARCHAR     (20)  NOT NULL UNIQUE,
+    descripcion          VARCHAR     (20)
+);
+GO
+
+-- 8. TABLA TIPO DENUNCIA
+CREATE TABLE tipo_denuncia (
+    id_tipo_denuncia INT IDENTITY(1,1) PRIMARY KEY,
+    nombre           VARCHAR     (20)  NOT NULL UNIQUE,
+    descripcion      VARCHAR     (40)
+);
+GO
+
+-- 9. TABLA USUARIO
+CREATE TABLE usuario (
+    id_usuario      INT IDENTITY(1,1) PRIMARY KEY,
+    id_rol          INT               NOT NULL,
+    id_tipo_usuario INT               NOT NULL,
+    nombres         VARCHAR     (10)  NOT NULL,
+    apellidos       VARCHAR     (20)  NOT NULL,
+    correo          VARCHAR     (20)  NOT NULL UNIQUE,
+    contrasena      VARCHAR     (15)  NOT NULL,
+    telefono        VARCHAR     (10)  NOT NULL,
+    fecha_registro  DATETIME2         NOT NULL,
+    estado          VARCHAR     (10)  NOT NULL,
+    FOREIGN KEY (id_rol) REFERENCES rol(id_rol),
+    FOREIGN KEY (id_tipo_usuario)
+        REFERENCES tipo_usuario(id_tipo_usuario)
+);
+GO
+
+-- 10. TABLA PERFIL
+CREATE TABLE perfil (
+    id_perfil           INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario          INT               NOT NULL UNIQUE,
+    informacion         VARCHAR     (30),
+    fecha_actualizacion DATETIME2         NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+GO
+
+-- 11. TABLA PUBLICACION
+CREATE TABLE publicacion (
+    id_publicacion    INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario        INT               NOT NULL,
+    contenido         VARCHAR     (30)  NOT NULL,
+    tipo_contenido    VARCHAR     (20)  NOT NULL,
+    fecha_publicacion DATETIME2         NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+GO
+
+-- 12. TABLA COMENTARIO
+CREATE TABLE comentario (
+    id_comentario    INT IDENTITY(1,1) PRIMARY KEY,
+    id_publicacion   INT               NOT NULL,
+    id_usuario       INT               NOT NULL,
+    contenido        VARCHAR     (30)  NOT NULL,
+    fecha_comentario DATETIME2         NOT NULL,
+    FOREIGN KEY (id_publicacion)
+        REFERENCES publicacion(id_publicacion),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+GO
+
+-- 13. TABLA GRUPO
+CREATE TABLE grupo (
+    id_grupo           INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario_creador INT               NOT NULL,
+    nombre             VARCHAR     (15)  NOT NULL,
+    descripcion        VARCHAR     (10),
+    categoria          VARCHAR     (10),
+    privacidad         VARCHAR     (10)  NOT NULL,
+    fecha_creacion     DATETIME2         NOT NULL,
+    estado             VARCHAR     (10)  NOT NULL,
+    FOREIGN KEY (id_usuario_creador)
+        REFERENCES usuario(id_usuario)
+);
+GO
+
+-- 14. TABLA SERVICIO
+CREATE TABLE servicio (
+    id_servicio      INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario       INT NOT NULL,
+    id_tipo_servicio INT NOT NULL,
+    nombre           VARCHAR(15) NOT NULL,
+    precio           DECIMAL(10,2) NOT NULL,
+    descripcion      VARCHAR(30),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tipo_servicio)
+        REFERENCES tipo_servicio(id_tipo_servicio)
+);
+GO
+
+-- 15. TABLA PRODUCTO
+CREATE TABLE producto (
+    id_producto         INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario_vendedor INT               NOT NULL,
+    id_tipo_producto    INT               NOT NULL,
+    nombre              VARCHAR(20)       NOT NULL,
+    precio              DECIMAL(10,2)     NOT NULL,
+    cantidad            INT               NOT NULL,
+    FOREIGN KEY (id_usuario_vendedor)
+        REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tipo_producto)
+        REFERENCES tipo_producto(id_tipo_producto)
+);
+GO
+
+-- 16. TABLA USUARIO SERVICIO
+CREATE TABLE usuario_servicio (
+    id_solicitud    INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario      INT               NOT NULL,
+    id_servicio     INT               NOT NULL,
+    fecha_solicitud DATETIME2         NOT NULL,
+    estado          VARCHAR     (10)  NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_servicio) REFERENCES servicio(id_servicio)
+);
+GO
+
+-- 17. TABLA USUARIO PRODUCTO
+CREATE TABLE usuario_producto (
+    id_adquisicion    INT IDENTITY(1,1) PRIMARY KEY,
+    id_producto       INT               NOT NULL,
+    id_usuario        INT               NOT NULL,
+    cantidad          INT               NOT NULL,
+    fecha_adquisicion DATETIME2         NOT NULL,
+    FOREIGN KEY (id_producto) REFERENCES producto(id_producto),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+GO
+
+-- 18. TABLA EVENTO
+CREATE TABLE evento (
+    id_evento      INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario     INT               NOT NULL,
+    id_tipo_evento INT               NOT NULL,
+    nombre         VARCHAR     (20)  NOT NULL,
+    fecha          DATETIME2         NOT NULL,
+    descripcion    VARCHAR     (30),
+    ubicacion      VARCHAR     (20),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tipo_evento)
+        REFERENCES tipo_evento(id_tipo_evento)
+);
+GO
+
+-- 19. TABLA REACCION
+CREATE TABLE reaccion (
+    id_reaccion      INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario       INT               NOT NULL,
+    id_publicacion   INT               NOT NULL,
+    id_tipo_reaccion INT               NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_publicacion)
+        REFERENCES publicacion(id_publicacion),
+    FOREIGN KEY (id_tipo_reaccion)
+        REFERENCES tipo_reaccion(id_tipo_reaccion)
+);
+GO
+
+-- 20. TABLA NOTIFICACION
+CREATE TABLE notificacion (
+    id_notificacion      INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario           INT               NOT NULL,
+    id_tipo_notificacion INT               NOT NULL,
+    id_publicacion       INT,
+    mensaje              VARCHAR     (20)  NOT NULL,
+    fecha                DATETIME2         NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tipo_notificacion)
+        REFERENCES tipo_notificacion(id_tipo_notificacion),
+    FOREIGN KEY (id_publicacion)
+        REFERENCES publicacion(id_publicacion)
+);
+GO
+
+-- 21. TABLA SOLICITUD DE AMISTAD
+CREATE TABLE solicitud_amistad (
+    id_solicitud    INT IDENTITY(1,1) PRIMARY KEY,
+    id_remitente    INT               NOT NULL,
+    id_destinatario INT               NOT NULL,
+    estado          VARCHAR     (10)  NOT NULL,
+    fecha_solicitud DATETIME2         NOT NULL,
+    FOREIGN KEY (id_remitente) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_destinatario) REFERENCES usuario(id_usuario)
+);
+GO
+
+-- 22. TABLA MENSAJE CHAT
+CREATE TABLE mensaje_chat (
+    id_mensaje UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    id_emisor      INT          NOT NULL,
+    id_receptor    INT          NOT NULL,
+    contenido      VARCHAR(40),
+    tipo_contenido VARCHAR(20)  NOT NULL,
+    fecha_envio    DATETIME2    NOT NULL,
+    fecha_lectura  DATETIME2,
+    FOREIGN KEY (id_emisor) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_receptor) REFERENCES usuario(id_usuario)
+);
+GO
+
+-- 23. TABLA DENUNCIA
+CREATE TABLE denuncia (
+    id_denuncia      INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario       INT               NOT NULL,
+    id_publicacion   INT,
+    id_tipo_denuncia INT               NOT NULL,
+    evidencia        VARCHAR     (30),
+    estado           VARCHAR     (20)  NOT NULL,
+    fecha_reporte    DATETIME2         NOT NULL,
+    accion_tomada    VARCHAR     (30),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_publicacion)
+        REFERENCES publicacion(id_publicacion),
+    FOREIGN KEY (id_tipo_denuncia)
+        REFERENCES tipo_denuncia(id_tipo_denuncia)
+);
+GO
+
